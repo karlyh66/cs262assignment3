@@ -19,6 +19,8 @@ using namespace std;
 
 clientInfo* client_info;
 std::unordered_map<std::string, int> active_users; // username : id
+std::unordered_map<int, int> backup_servers; // map of backup servers' socket id's
+std::unordered_map<std::string, std::string> all_messages; // username : all messages (in order)
 std::unordered_map<std::string, std::string> logged_out_users; // username : undelivered messages
 std::set<std::string> account_set; // all usernames (both logged in AND not logged in)
 

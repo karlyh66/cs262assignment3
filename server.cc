@@ -18,7 +18,9 @@
 using namespace std;
 
 clientInfo* client_info;
-std::unordered_map<std::string, int> active_users; // username : id
+std::unordered_map<std::string, int> active_users; // username : socket id
+std::unordered_map<int, int> backup_servers; // map of backup servers' socket id's
+std::unordered_map<std::string, std::string> all_messages; // username : all messages (in order)
 std::unordered_map<std::string, std::string> logged_out_users; // username : undelivered messages
 std::set<std::string> account_set; // all usernames (both logged in AND not logged in)
 
@@ -65,7 +67,7 @@ int main(int argc, char *argv[]) {
 
     // serverSd: master socket
     int serverSd, addrlen, new_socket , client_socket[10] , 
-          max_clients = 10 , curr_clients = 0, activity, i , valread , sd;
+          max_clients = 12 , curr_clients = 0, activity, i , valread , sd;
 
     int max_sd; 
     
@@ -113,6 +115,8 @@ int main(int argc, char *argv[]) {
     sockaddr_in newSockAddr;
     socklen_t newSockAddrSize = sizeof(newSockAddr);
 
+    int num_connections = 0;
+
     while (1) {
         //clear the socket set 
         FD_ZERO(&clientfds);  
@@ -153,6 +157,15 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);  
             }
 
+            if (num_connections == 0) {
+                backup_servers[1] = new_socket;
+                //inform server of socket number - used in send and receive commands 
+                printf("New backup server connection , socket fd is %d, ip is: %s, port: %d\n",
+                new_socket, inet_ntoa(newSockAddr.sin_addr), ntohs
+                  (newSockAddr.sin_port));
+                num_connections++;
+                continue;
+            }
 
             // ask client for username (client will send upon connecting to the server)
             memset(&msg, 0, sizeof(msg)); //clear the buffer
@@ -243,10 +256,16 @@ int main(int argc, char *argv[]) {
                 printf("message: %s\n", message.c_str());
                 printf("message length: %lu\n", strlen(message.c_str()));
 
+                // updating within
+                all_messages[username] = all_messages[username] + "From " + sender_username + ": " + message + "\n";
+                all_messages[sender_username] = all_messages[sender_username] + "To " + username + ": " + message + "\n";
+
                 if (operation == '2') { // list accounts
                     listAccounts(message, client_socket, bytesWritten, account_set, i);
                 } else if (operation == '1') { // send message
                     sendMessage(username, message, sender_username, client_socket, bytesWritten, active_users, logged_out_users, i);
+                    // "username" here is recipient username
+                    sendBackupMessage(username, message, sender_username, backup_servers[1], bytesWritten);
                 }
             }
         }

@@ -1,3 +1,5 @@
+// INITIAL PRIMARY SERVER
+
 #include <iostream>
 #include <string>
 #include <stdio.h>
@@ -54,6 +56,18 @@ string sendMessage(string username, string message, string sender_username, int*
         }
         return message;
     } 
+}
+
+string sendBackupMessage(
+    string username,
+    string message,
+    string sender_username,
+    int backupfd, int &bytesWritten) {
+    // user is logged out, save message for them
+    printf("Sending message to backup server...\n");
+    message = sender_username + " " + username + " "  + message;
+    bytesWritten = send(backupfd, message.c_str(), strlen(message.c_str()), 0);
+    return message;
 }
 
 // allows a user to check which accounts exist, including logged out ones, that contain a wildcard
