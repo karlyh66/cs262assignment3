@@ -1,0 +1,10 @@
+Engineering Notebook
+=============================================
+
+4/14 (Tues) evening
+=============================================
+Initial ideas:
+- In each server program, store unordered mapping from username to all messages sent to that username
+    - In order!
+- Update all server programs EVERY time a new message comes in from ANY user
+
