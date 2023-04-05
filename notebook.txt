@@ -7,4 +7,15 @@ Initial ideas:
 - In each server program, store unordered mapping from username to all messages sent to that username
     - In order!
 - Update all server programs EVERY time a new message comes in from ANY user
+- All clients connect to a main server
+- Two backup servers indepedently connect to the main server almost as if they were clients
+- Main client-server interactions still function as before but we maintain log of all previous messages
+- Whenever a client sends a message through the server to another, the server sends copies to both backup servers
+- Backup servers have a hierarchy: server 2, server 3
+- If the main server dies, all users are logged out and they reconnect to server 2
+- Server 3 connects to server 2 to continue being its backup
+- Optional: if server 1 comes back up, it should reconnect to server 2 (or server 3 if it has become main) to now 
+  join the circulation as its backup?
 
+
+  
