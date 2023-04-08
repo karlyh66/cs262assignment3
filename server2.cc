@@ -65,9 +65,13 @@ int main(int argc, char *argv[]) {
     sendSockAddr.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr*)*host->h_addr_list));
     sendSockAddr.sin_port = htons(port);
 
-    int clientSd = socket(AF_INET, SOCK_STREAM, 0);
+    // register signal handler
+    // signal(SIGINT, sigintHandler);
+    // signal(SIGABRT, sigabrtHandler);
+
+    int primarySd = socket(AF_INET, SOCK_STREAM, 0);
     //try to connect...
-    int status = connect(clientSd,(sockaddr*) &sendSockAddr, sizeof(sendSockAddr));
+    int status = connect(primarySd,(sockaddr*) &sendSockAddr, sizeof(sendSockAddr));
     if(status < 0)
     {
         cout<<"Error connecting to socket"<<endl;
@@ -87,7 +91,7 @@ int main(int argc, char *argv[]) {
         char msg_recv[1500]; 
         // reading from server
         memset(&msg_recv, 0, sizeof(msg_recv)); // clear the buffer
-        bytesRead += recv(clientSd, (char*)&msg_recv, sizeof(msg_recv), 0);
+        bytesRead += recv(primarySd, (char*)&msg_recv, sizeof(msg_recv), 0);
         
         // parse this string for sender username, receipient username, and actual message body
         string msg_string(msg_recv);
@@ -112,7 +116,7 @@ int main(int argc, char *argv[]) {
         pending_log[recipient] = pending_log[recipient] + "From " + sender + ": " + message + "\n";
         pending_log[sender] = pending_log[sender] + "To " + recipient + ": " + message + "\n";
         // send acknowledgement to primary server
-        sendAck(clientSd, selfId, bytesWritten);
+        sendAck(primarySd, selfId, bytesWritten);
     }
 
     cout << "Connection closed" << endl;

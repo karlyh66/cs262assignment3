@@ -71,6 +71,12 @@ string sendBackupMessage(
     return message;
 }
 
+string sendBackupTerminationMessage(int backupfd) {
+    string message = "primary died";
+    int bytesWritten = send(backupfd, message.c_str(), strlen(message.c_str()), 0);
+    return message;
+}
+
 string sendAck(int primary_fd, int self_id, int &bytesWritten) {
     printf("Acknowledging message received from primary server. \n");
     string message = "Acknowledgement from " + self_id;

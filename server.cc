@@ -25,8 +25,9 @@ std::unordered_map<std::string, std::string> pending_log; // username : pending 
 std::unordered_map<std::string, std::string> logged_out_users; // username : undelivered messages
 std::set<std::string> account_set; // all usernames (both logged in AND not logged in)
 
-void sigintHandler( int signum ) {
+void sigintHandler(int signum) {
     cout << "Interrupt signal (" << signum << ") received.\n";
+    cout << "ok good\n";
     char msg[1500];
     for (auto it = active_users.begin(); it != active_users.end(); ++it) {
         int sd = it->second;
@@ -36,12 +37,31 @@ void sigintHandler( int signum ) {
         // send(new_socket, (char*)&msg, strlen(msg), 0);
         send(sd, (char*)&msg, sizeof(msg), 0);
     }
-   exit(signum);
+    const char* to_new_primary_message = "primary died, you are now primary";
+    const char* to_backup_message = "primary died, you are still backup";
+
+    // flip a coin to determine next backup
+    int new_primary_key = (rand() % 2) + 1;
+    
+    memset(&msg, 0, sizeof(msg));
+    strcpy(msg, to_new_primary_message);
+    send(backup_servers[new_primary_key], (char*)&msg, sizeof(msg), 0);
+
+    memset(&msg, 0, sizeof(msg));
+    strcpy(msg, to_backup_message);
+    send(backup_servers[3 - new_primary_key], (char*)&msg, sizeof(msg), 0);
+    exit(signum);
 }
 
 // this should be handled when a client Ctrl+C's
 void sigabrtHandler(int signum) {
     cout << "Interrupt signal (" << signum << ") received.\n";
+    cout << "ok good\n";
+    char msg[1500];
+    memset(&msg, 0, sizeof(msg));
+    const char* to_backup_message = "primary died";
+    strcpy(msg, to_backup_message);
+    send(backup_servers[1], (char*)&msg, sizeof(msg), 0);
 }
 
 int main(int argc, char *argv[]) {
@@ -267,7 +287,6 @@ int main(int argc, char *argv[]) {
                     sendMessage(username, message, sender_username, client_socket, bytesWritten, active_users, logged_out_users, i);
                     // "username" here is recipient username
                     sendBackupMessage(username, message, sender_username, backup_servers[1], bytesWritten);
-
                     // TODO: implement waiting on acknowledgments from both backup machines
                 }
             }
