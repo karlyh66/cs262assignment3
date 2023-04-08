@@ -42,7 +42,7 @@ void sigintHandler( int signum ) {
 }
 
 // this should be handled when a client Ctrl+C's
-void sigabrtHandler(int signum) {
+void sigabrtHandler(int signum, int port) {
     cout << "Interrupt signal (" << signum << ") received.\n";
 }
 
