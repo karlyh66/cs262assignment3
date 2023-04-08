@@ -20,7 +20,8 @@ using namespace std;
 clientInfo* client_info;
 std::unordered_map<std::string, int> active_users; // username : socket id
 std::unordered_map<int, int> backup_servers; // map of backup servers' socket id's
-std::unordered_map<std::string, std::string> all_messages; // username : all messages (in order)
+std::unordered_map<std::string, std::string> commit_log; // username : committed messages (in order)
+std::unordered_map<std::string, std::string> pending_log; // username : pending messages (in order)
 std::unordered_map<std::string, std::string> logged_out_users; // username : undelivered messages
 std::set<std::string> account_set; // all usernames (both logged in AND not logged in)
 
@@ -244,7 +245,7 @@ int main(int argc, char *argv[]) {
                     deleteAccount(sd, client_socket, sender_username, active_users, account_set, logged_out_users, i);
                     continue;
                 }
-
+                
                 // operation, username, message
                 size_t pos2 = msg_string.find('\n', 2);
                 printf("pos2: %zu\n", pos2);
@@ -256,9 +257,9 @@ int main(int argc, char *argv[]) {
                 printf("message: %s\n", message.c_str());
                 printf("message length: %lu\n", strlen(message.c_str()));
 
-                // updating within
-                all_messages[username] = all_messages[username] + "From " + sender_username + ": " + message + "\n";
-                all_messages[sender_username] = all_messages[sender_username] + "To " + username + ": " + message + "\n";
+                // updating within the backup (internal)
+                pending_log[username] = pending_log[username] + "From " + sender_username + ": " + message + "\n";
+                pending_log[sender_username] = pending_log[sender_username] + "To " + username + ": " + message + "\n";
 
                 if (operation == '2') { // list accounts
                     listAccounts(message, client_socket, bytesWritten, account_set, i);

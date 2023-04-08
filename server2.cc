@@ -22,7 +22,8 @@ using namespace std;
 clientInfo* client_info;
 std::unordered_map<std::string, int> active_users; // username : id
 std::unordered_map<int, int> backup_servers; // map of backup servers' socket id's
-std::unordered_map<std::string, std::string> all_messages; // username : all messages (in order)
+std::unordered_map<std::string, std::string> commit_log; // username : committed messages (in order)
+std::unordered_map<std::string, std::string> pending_log; // username : pending messages (in order)
 std::unordered_map<std::string, std::string> logged_out_users; // username : undelivered messages
 std::set<std::string> account_set; // all usernames (both logged in AND not logged in)
 
@@ -86,10 +87,29 @@ int main(int argc, char *argv[]) {
         // reading from server
         memset(&msg_recv, 0, sizeof(msg_recv)); // clear the buffer
         bytesRead += recv(clientSd, (char*)&msg_recv, sizeof(msg_recv), 0);
-        printf("\n%s\n", msg_recv);
+        
+        // parse this string for sender username, receipient username, and actual message body
+        string msg_string(msg_recv);
 
-        // TODO: parse this string for sender username, receipient username, and actual message body
-        // and store these pieces into the all_messages map
+        printf("full msg string: %s\n", msg_string.c_str());
+
+        size_t pos1 = msg_string.find('\n');
+        size_t pos2 = msg_string.find('\n', pos1 + 1);
+        printf("pos1: %zu\n", pos1);
+        printf("pos2: %zu\n", pos2);
+
+        string sender = msg_string.substr(0, pos1);
+
+        string recipient = msg_string.substr(pos1 + 1, pos2 - pos1 - 1);
+        printf("sender username: %s\n", sender.c_str());
+        printf("recipient username: %s\n", recipient.c_str());
+        string message = msg_string.substr(pos2 + 1, msg_string.length() - pos2);
+        printf("message: %s\n", message.c_str());
+        printf("message length: %lu\n", strlen(message.c_str()));
+
+        // TODO: store these pieces into the pending_log map through an internal update
+        pending_log[recipient] = pending_log[recipient] + "From " + sender + ": " + message + "\n";
+        pending_log[sender] = pending_log[sender] + "To " + recipient + ": " + message + "\n";
     }
 
     cout << "Connection closed" << endl;

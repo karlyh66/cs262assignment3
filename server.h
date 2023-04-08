@@ -65,7 +65,7 @@ string sendBackupMessage(
     int backupfd, int &bytesWritten) {
     // user is logged out, save message for them
     printf("Sending message to backup server...\n");
-    message = sender_username + " " + username + " "  + message;
+    message = sender_username + "\n" + username + "\n"  + message;
     bytesWritten = send(backupfd, message.c_str(), strlen(message.c_str()), 0);
     return message;
 }

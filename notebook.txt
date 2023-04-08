@@ -1,7 +1,7 @@
 Engineering Notebook
 =============================================
 
-4/14 (Tues) evening
+4/4 (Tues) evening
 =============================================
 Initial ideas:
 - In each server program, store unordered mapping from username to all messages sent to that username
@@ -16,6 +16,13 @@ Initial ideas:
 - Server 3 connects to server 2 to continue being its backup
 - Optional: if server 1 comes back up, it should reconnect to server 2 (or server 3 if it has become main) to now 
   join the circulation as its backup?
+
+4/8 (Sat)
+=============================================
+- Implemented some version of backup server acknowledgement 
+- Implemented the primary server sending a log entry to the backup servers, and the backup server parsing that entry
+TODO:
+- Integrate primary server and backup server implementation into one program (through threading)
 
 
   
