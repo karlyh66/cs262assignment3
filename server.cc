@@ -40,16 +40,20 @@ void sigintHandler(int signum) {
     const char* to_new_primary_message = "primary died, you are now primary";
     const char* to_backup_message = "primary died, you are still backup";
 
-    // flip a coin to determine next backup
-    int new_primary_key = (rand() % 2) + 1;
-    
     memset(&msg, 0, sizeof(msg));
     strcpy(msg, to_new_primary_message);
-    send(backup_servers[new_primary_key], (char*)&msg, sizeof(msg), 0);
+    send(backup_servers[1], (char*)&msg, sizeof(msg), 0);
 
-    memset(&msg, 0, sizeof(msg));
-    strcpy(msg, to_backup_message);
-    send(backup_servers[3 - new_primary_key], (char*)&msg, sizeof(msg), 0);
+    // // flip a coin to determine next backup
+    // int new_primary_key = (rand() % 2) + 1;
+    
+    // memset(&msg, 0, sizeof(msg));
+    // strcpy(msg, to_new_primary_message);
+    // send(backup_servers[new_primary_key], (char*)&msg, sizeof(msg), 0);
+
+    // memset(&msg, 0, sizeof(msg));
+    // strcpy(msg, to_backup_message);
+    // send(backup_servers[3 - new_primary_key], (char*)&msg, sizeof(msg), 0);
     exit(signum);
 }
 

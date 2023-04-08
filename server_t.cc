@@ -32,7 +32,7 @@ std::set<std::string> account_set; // all usernames (both logged in AND not logg
 
 
 // siginthandler for when this machine is the primary
-void sigintHandlerPrimary( int signum ) {
+void sigintHandlerPrimary(int signum) {
     cout << "Interrupt signal (" << signum << ") received.\n";
     cout << "ok good\n";
     char msg[1500];
@@ -47,16 +47,20 @@ void sigintHandlerPrimary( int signum ) {
     const char* to_new_primary_message = "primary died, you are now primary";
     const char* to_backup_message = "primary died, but you are still backup";
 
-    // flip a coin to determine next backup
-    int new_primary_key = (rand() % 2) + 1;
-    
     memset(&msg, 0, sizeof(msg));
     strcpy(msg, to_new_primary_message);
-    send(backup_servers[new_primary_key], (char*)&msg, sizeof(msg), 0);
+    send(backup_servers[1], (char*)&msg, sizeof(msg), 0);
 
-    memset(&msg, 0, sizeof(msg));
-    strcpy(msg, to_backup_message);
-    send(backup_servers[3 - new_primary_key], (char*)&msg, sizeof(msg), 0);
+    // flip a coin to determine next backup
+    // int new_primary_key = (rand() % 2) + 1;
+    
+    // memset(&msg, 0, sizeof(msg));
+    // strcpy(msg, to_new_primary_message);
+    // send(backup_servers[new_primary_key], (char*)&msg, sizeof(msg), 0);
+
+    // memset(&msg, 0, sizeof(msg));
+    // strcpy(msg, to_backup_message);
+    // send(backup_servers[3 - new_primary_key], (char*)&msg, sizeof(msg), 0);
     exit(signum);
 }
 
@@ -77,19 +81,15 @@ void listen_for_acks(int backup_sd, int bytes_read, bool &received) {
     }
 }
 
-void listen_for_acks(int backup_sd, int bytes_read, bool &received) {
-    while(1) {
-        // create a message buffer for the message to be received
-        char msg_recv[1500]; 
-        // reading from server
-        memset(&msg_recv, 0, sizeof(msg_recv)); // clear the buffer
-        received = true;
-        bytes_read += recv(backup_sd, (char*)&msg_recv, sizeof(msg_recv), 0);
-    }
-}
-
 // function that handles going from primary to backup
-void backup(sockaddr_in sendSockAddr, char msg[1500]) {
+void backup(char msg[1500], int port, hostent* host) {
+
+    // server address
+    sockaddr_in sendSockAddr;   
+    bzero((char*)&sendSockAddr, sizeof(sendSockAddr)); 
+    sendSockAddr.sin_family = AF_INET; 
+    sendSockAddr.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr*)*host->h_addr_list));
+    sendSockAddr.sin_port = htons(port);
 
     printf("entered backup thread\n");
     // connect to the server, like we would with a client
@@ -120,6 +120,7 @@ void backup(sockaddr_in sendSockAddr, char msg[1500]) {
 
         if (!strcmp(msg_recv, "primary died, you are now primary")) {
             printf("\nfrom backup to primary\n");
+            close(primarySd_backup);
             return;
         }
 
@@ -178,18 +179,9 @@ int main(int argc, char *argv[]) {
     //setup a socket and connection tools 
     struct hostent* host = gethostbyname(serverIp); 
 
-    // server address
-    sockaddr_in sendSockAddr;   
-    bzero((char*)&sendSockAddr, sizeof(sendSockAddr)); 
-    sendSockAddr.sin_family = AF_INET; 
-    sendSockAddr.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr*)*host->h_addr_list));
-    sendSockAddr.sin_port = htons(port);
-
     // THREAD OFF INTO BACKUP
-    // TODO: guard this with the is_primary boolean
-
     if (!is_primary) {
-        std::thread t(backup, sendSockAddr, msg);
+        std::thread t(backup, msg, port, host);
         t.join();
     }
 
@@ -199,11 +191,17 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, sigintHandlerPrimary);
     signal(SIGABRT, sigabrtHandlerPrimary);
 
+    sockaddr_in servAddr;
+    bzero((char*)&servAddr, sizeof(servAddr));
+    servAddr.sin_family = AF_INET;
+    servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servAddr.sin_port = htons(port);
+
     // serverSd: master socket
     int serverSd, addrlen, new_socket , client_socket[10] , 
           max_clients = 12 , curr_clients = 0, activity, i , valread , sd;
 
-    int max_sd; 
+    int max_sd;
     
     //set of socket descriptors 
     fd_set clientfds;
@@ -223,23 +221,23 @@ int main(int argc, char *argv[]) {
     }
 
     //set master socket to allow multiple connections 
-    int iSetOption = 1;
-    if( setsockopt(serverSd, SOL_SOCKET, SO_REUSEADDR, (char *)&iSetOption, 
-          sizeof(iSetOption)) < 0 )  
-    {  
-        perror("setsockopt");  
-        exit(EXIT_FAILURE);  
-    }
+    // int iSetOption = 1;
+    // if( setsockopt(serverSd, SOL_SOCKET, SO_REUSEADDR, (char *)&iSetOption, 
+    //       sizeof(iSetOption)) < 0 )  
+    // {  
+    //     perror("setsockopt");  
+    //     exit(EXIT_FAILURE);  
+    // }
 
     //bind the socket to its local address
-    int bindStatus = ::bind(serverSd, (sockaddr*) &sendSockAddr, 
-        sizeof(sendSockAddr));
+
+    int bindStatus = ::bind(serverSd, (sockaddr*) &servAddr, 
+        sizeof(servAddr));
     if(bindStatus < 0)
     {
         cerr << "Error binding socket to local address" << endl;
         exit(0);
     }
-
 
     //listen for up to 10 requests at a time
     listen(serverSd, 10);
