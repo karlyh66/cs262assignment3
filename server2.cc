@@ -19,6 +19,7 @@
 #include "server.h"
 using namespace std;
 
+int selfId; // server id, given when started
 clientInfo* client_info;
 std::unordered_map<std::string, int> active_users; // username : id
 std::unordered_map<int, int> backup_servers; // map of backup servers' socket id's
@@ -35,7 +36,6 @@ void sigintHandler( int signum ) {
         memset(&msg, 0, sizeof(msg));
         const char* server_shutdown_msg = "Server shut down permaturely, so logging you out.";
         strcpy(msg, server_shutdown_msg);
-        // send(new_socket, (char*)&msg, strlen(msg), 0);
         send(sd, (char*)&msg, sizeof(msg), 0);
     }
    exit(signum);
@@ -47,12 +47,13 @@ void sigabrtHandler(int signum) {
 }
 
 int main(int argc, char *argv[]) {
-    //we need 2 things: ip address and port number, in that order
+    //we need 3 things: ip address, port number, id, in that order
     if(argc != 3){
         cerr << "Usage: ip_address port" << endl; exit(0); 
     } //grab the IP address and port number 
     char *serverIp = argv[1]; 
     int port = atoi(argv[2]); 
+    selfId = atoi(argv[3]);
     //create a message buffer 
     char msg[1500]; 
     //setup a socket and connection tools 
@@ -110,6 +111,11 @@ int main(int argc, char *argv[]) {
         // TODO: store these pieces into the pending_log map through an internal update
         pending_log[recipient] = pending_log[recipient] + "From " + sender + ": " + message + "\n";
         pending_log[sender] = pending_log[sender] + "To " + recipient + ": " + message + "\n";
+        // send acknowledgement to primary server
+        sendAck(clientSd, selfId, bytesWritten);
+
+        // TODO: parse this string for sender username, receipient username, and actual message body
+        // and store these pieces into the all_messages map
     }
 
     cout << "Connection closed" << endl;
