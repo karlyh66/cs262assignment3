@@ -66,6 +66,28 @@ void sigabrtHandlerPrimary(int signum) {
     cout << "Interrupt signal (" << signum << ") received.\n";
 }
 
+void listen_for_acks(int backup_sd, int bytes_read, bool &received) {
+    while(1) {
+        // create a message buffer for the message to be received
+        char msg_recv[1500]; 
+        // reading from server
+        memset(&msg_recv, 0, sizeof(msg_recv)); // clear the buffer
+        received = true;
+        bytes_read += recv(backup_sd, (char*)&msg_recv, sizeof(msg_recv), 0);
+    }
+}
+
+void listen_for_acks(int backup_sd, int bytes_read, bool &received) {
+    while(1) {
+        // create a message buffer for the message to be received
+        char msg_recv[1500]; 
+        // reading from server
+        memset(&msg_recv, 0, sizeof(msg_recv)); // clear the buffer
+        received = true;
+        bytes_read += recv(backup_sd, (char*)&msg_recv, sizeof(msg_recv), 0);
+    }
+}
+
 // function that handles going from primary to backup
 void backup(sockaddr_in sendSockAddr, char msg[1500]) {
 
