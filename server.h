@@ -70,6 +70,13 @@ string sendBackupMessage(
     return message;
 }
 
+string sendAck(int primary_fd, int self_id, int &bytesWritten) {
+    printf("Acknowledging message received from primary server. \n");
+    message = "Acknowledgement from " + self_id.c_str();
+    bytesWritten = send(sender_fd, message.c_str(), strlen(message.c_str()), 0);
+    return message;
+}
+
 // allows a user to check which accounts exist, including logged out ones, that contain a wildcard
 string listAccounts(string wildcard, int* client_socket, int &bytesWritten, \
     std::set<std::string> &account_set, int i) {    
