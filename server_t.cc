@@ -176,6 +176,12 @@ int main(int argc, char *argv[]) {
         pending_log[sender] = pending_log[sender] + "To " + recipient + ": " + message + "\n";
         // send acknowledgement to primary server
         sendAck(primarySd, selfId, bytesWritten);
+
+        bool ack1 = false;
+        bool ack2 = false;
+        std::thread ack_1(listen_for_acks, backup_sd_1, bytesWritten, ack1);
+        std::thread ack_1(listen_for_acks, backup_sd_2, bytesWritten, ack2);
+        while(!ack1 && !ack2) {}
     }
 
     cout << "Connection closed" << endl;
