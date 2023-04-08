@@ -113,9 +113,6 @@ int main(int argc, char *argv[]) {
         pending_log[sender] = pending_log[sender] + "To " + recipient + ": " + message + "\n";
         // send acknowledgement to primary server
         sendAck(clientSd, selfId, bytesWritten);
-
-        // TODO: parse this string for sender username, receipient username, and actual message body
-        // and store these pieces into the all_messages map
     }
 
     cout << "Connection closed" << endl;

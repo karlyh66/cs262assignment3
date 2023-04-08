@@ -58,6 +58,7 @@ string sendMessage(string username, string message, string sender_username, int*
     } 
 }
 
+// send message to backup machines
 string sendBackupMessage(
     string username,
     string message,
@@ -72,8 +73,8 @@ string sendBackupMessage(
 
 string sendAck(int primary_fd, int self_id, int &bytesWritten) {
     printf("Acknowledging message received from primary server. \n");
-    message = "Acknowledgement from " + self_id.c_str();
-    bytesWritten = send(sender_fd, message.c_str(), strlen(message.c_str()), 0);
+    string message = "Acknowledgement from " + self_id;
+    bytesWritten = send(primary_fd, message.c_str(), strlen(message.c_str()), 0);
     return message;
 }
 

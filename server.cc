@@ -245,7 +245,7 @@ int main(int argc, char *argv[]) {
                     deleteAccount(sd, client_socket, sender_username, active_users, account_set, logged_out_users, i);
                     continue;
                 }
-                
+
                 // operation, username, message
                 size_t pos2 = msg_string.find('\n', 2);
                 printf("pos2: %zu\n", pos2);
@@ -267,6 +267,8 @@ int main(int argc, char *argv[]) {
                     sendMessage(username, message, sender_username, client_socket, bytesWritten, active_users, logged_out_users, i);
                     // "username" here is recipient username
                     sendBackupMessage(username, message, sender_username, backup_servers[1], bytesWritten);
+
+                    // TODO: implement waiting on acknowledgments from both backup machines
                 }
             }
         }
