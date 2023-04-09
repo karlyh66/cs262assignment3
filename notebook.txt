@@ -17,14 +17,32 @@ Initial ideas:
 - Optional: if server 1 comes back up, it should reconnect to server 2 (or server 3 if it has become main) to now 
   join the circulation as its backup?
 
-4/8 (Sat)
+4/8 (Sat) afternoon
 =============================================
 - Implemented some version of backup server acknowledgement 
 - Implemented the primary server sending a log entry to the backup servers, and the backup server parsing that entry
-- Implemented backup servers updating their state when users connected to primary server create an account, delete account,
-  or send messages to other users.
 TODO:
 - Integrate primary server and backup server implementation into one program (through threading)
+- Code to run:
+g++ -o server_t2 server_t2.cc --std=c++11 
+./server_t2 10.250.2.9 5000 1
+./server_t2 10.250.2.9 5000 0
+./server_t2 10.250.2.9 5000 0
 
-
-  
+4/8 (Sat) evening
+=============================================
+- Combined primary and backup server implementation in one program 
+    - There is a thread for the backup server, and the main program is for the primary server
+- Handled the case where primary server crashes: flip a coin to determine which backup server becomes primary, and which backup server stays as backup
+- Implemented backup -> primary: exit out of backup thread, and start a new listening socket
+    - We ran into a bug where the primary program could not bind a listener socket to the same port
+        - Solution: sleep for 1 second before the new primary attempts to bind a listener socket to that same port
+- Implemented passing state updates between from primary to backups:
+    - Message from one client to another
+    - Account creation
+    - Account deletion
+TODO: 
+- Handle what happens when one *backup* server fails or crashes
+- Handle what happens when there is only one primary server + one backup up
+    - Disallow a client from joining before the second backup server comes up
+- Handle the case where client does Ctrl+C
