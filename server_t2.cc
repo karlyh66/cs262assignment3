@@ -122,7 +122,6 @@ void backup(char msg[1500], hostent* host, int port) {
             string username = msg_string.substr(2, msg_string.length() - 3);
             printf("username: %s\n", username.c_str());
             account_set.insert(username);
-            return;
         }
 
         if (!strcmp(msg_string.substr(0,1).c_str(), "2")) {
@@ -130,7 +129,6 @@ void backup(char msg[1500], hostent* host, int port) {
             string username = msg_string.substr(2, msg_string.length() - 3);
             printf("username: %s\n", username.c_str());
             account_set.erase(username);
-            return;
         }
 
         if (!strcmp(msg_recv, "primary died, you are now primary")) {
@@ -157,7 +155,7 @@ void backup(char msg[1500], hostent* host, int port) {
             }
         }
 
-        // parse this string for sender username, receipient username, and actual message body
+        // parse this string for sender username, recipient username, and actual message body
 
         printf("full msg string: %s\n", msg_string.c_str());
 
