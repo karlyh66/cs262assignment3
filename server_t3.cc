@@ -50,17 +50,17 @@ void sigintHandlerPrimary( int signum ) {
     // flip a coin to determine next backup
     int new_primary_key = (rand() % 2) + 1;
 
-    // memset(&msg, 0, sizeof(msg));
-    // strcpy(msg, to_new_primary_message);
-    // send(backup_servers[1], (char*)&msg, sizeof(msg), 0);
-    
     memset(&msg, 0, sizeof(msg));
     strcpy(msg, to_new_primary_message);
-    send(backup_servers[new_primary_key], (char*)&msg, sizeof(msg), 0);
+    send(backup_servers[1], (char*)&msg, sizeof(msg), 0);
+    
+    // memset(&msg, 0, sizeof(msg));
+    // strcpy(msg, to_new_primary_message);
+    // send(backup_servers[new_primary_key], (char*)&msg, sizeof(msg), 0);
 
-    memset(&msg, 0, sizeof(msg));
-    strcpy(msg, to_backup_message);
-    send(backup_servers[3 - new_primary_key], (char*)&msg, sizeof(msg), 0);
+    // memset(&msg, 0, sizeof(msg));
+    // strcpy(msg, to_backup_message);
+    // send(backup_servers[3 - new_primary_key], (char*)&msg, sizeof(msg), 0);
     exit(signum);
 }
 
@@ -71,17 +71,10 @@ void sigabrtHandlerPrimary(int signum) {
 }
 
 // function that handles going from primary to backup
-void backup(char msg[1500], hostent* host, int port) {
+void backup(sockaddr_in sendSockAddr, char msg[1500]) {
 
     printf("entered backup thread\n");
     // connect to the server, like we would with a client
-
-    // server address
-    sockaddr_in sendSockAddr;   
-    bzero((char*)&sendSockAddr, sizeof(sendSockAddr)); 
-    sendSockAddr.sin_family = AF_INET; 
-    sendSockAddr.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr*)*host->h_addr_list));
-    sendSockAddr.sin_port = htons(port);
 
     int primarySd_backup = socket(AF_INET, SOCK_STREAM, 0);
     //set master socket to allow multiple connections 
@@ -123,14 +116,6 @@ void backup(char msg[1500], hostent* host, int port) {
         if (!strcmp(msg_recv, "primary died, but you are still backup")) {
             // reconnect to the primary
             close(primarySd_backup);
-            sleep(7);
-            primarySd_backup = socket(AF_INET, SOCK_STREAM, 0);
-            // server address
-            // sockaddr_in sendSockAddr2;   
-            // bzero((char*)&sendSockAddr2, sizeof(sendSockAddr2)); 
-            // sendSockAddr2.sin_family = AF_INET; 
-            // sendSockAddr2.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr*)*host->h_addr_list));
-            // sendSockAddr2.sin_port = htons(port);
             int status = connect(primarySd_backup,(sockaddr*) &sendSockAddr, sizeof(sendSockAddr));
             if(status < 0)
             {
@@ -183,16 +168,20 @@ int main(int argc, char *argv[]) {
     //setup a socket and connection tools 
     struct hostent* host = gethostbyname(serverIp); 
 
+    // server address
+    sockaddr_in sendSockAddr;   
+    bzero((char*)&sendSockAddr, sizeof(sendSockAddr)); 
+    sendSockAddr.sin_family = AF_INET; 
+    sendSockAddr.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr*)*host->h_addr_list));
+    sendSockAddr.sin_port = htons(port);
 
     // THREAD OFF INTO BACKUP
     // TODO: guard this with the is_primary boolean
 
     if (!is_primary) {
-        std::thread t(backup, msg, host, port);
+        std::thread t(backup, sendSockAddr, msg);
         t.join();
-        backup_servers[1] = 0;
-        backup_servers[2] = 0;
-        sleep(4);
+        sleep(1);
     }
 
     printf("THIS SERVER IS NOW THE PRIMARY\n");
@@ -260,15 +249,15 @@ int main(int argc, char *argv[]) {
 
     while (1) {
         //clear the socket set 
-        FD_ZERO(&clientfds);
+        FD_ZERO(&clientfds);  
      
         //add master socket to set 
-        FD_SET(serverSd, &clientfds);
-        max_sd = serverSd;
+        FD_SET(serverSd, &clientfds);  
+        max_sd = serverSd;  
 
         //add child sockets to set 
         for ( i = 0 ; i < max_clients ; i++)  
-        {
+        {  
             sd = client_socket[i];  
                  
             //if valid socket descriptor then add to read list 
@@ -298,8 +287,8 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);  
             }
 
-            if (num_connections <= 1) {
-                backup_servers[num_connections + 1] = new_socket;
+            if (num_connections == 0) {
+                backup_servers[1] = new_socket;
                 //inform server of socket number - used in send and receive commands 
                 printf("New backup server connection , socket fd is %d, ip is: %s, port: %d\n",
                 new_socket, inet_ntoa(newSockAddr.sin_addr), ntohs
