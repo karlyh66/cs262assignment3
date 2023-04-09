@@ -115,6 +115,22 @@ void backup(char msg[1500], hostent* host, int port) {
         memset(&msg_recv, 0, sizeof(msg_recv)); // clear the buffer
         bytesRead += recv(primarySd_backup, (char*)&msg_recv, sizeof(msg_recv), 0);
 
+        if (!strcmp(msg_recv[0], 1)) {
+            printf("\nAccount created\n");
+            string username = msg_recv.substr(2, length(msg_recv) - 3);
+            printf("username: %s\n", username.c_str());
+            account_set.insert(username);
+            return;
+        }
+
+        if (!strcmp(msg_recv[0], 2)) {
+            printf("\nAccount deleted\n");
+            string username = msg_recv.substr(2, length(msg_recv) - 3);
+            printf("username: %s\n", username.c_str());
+            account_set.erase(username);
+            return;
+        }
+
         if (!strcmp(msg_recv, "primary died, you are now primary")) {
             printf("\nfrom backup to primary\n");
             return;
@@ -319,9 +335,12 @@ int main(int argc, char *argv[]) {
                 const char* force_logout_msg = "Another user logged in as your name, so logging you out.";
                 strcpy(msg, force_logout_msg);
                 send(existing_login_sd, (char*)&msg, sizeof(msg), 0);
+            } else {
+                account_set.insert(new_client_username);
+                sendAccountCreation(sender_username, backup_servers[1], bytesWritten);
+                sendAccountCreation(sender_username, backup_servers[2], bytesWritten);
             }
             active_users[new_client_username] = new_socket;
-            account_set.insert(new_client_username);
 
             // check whether this user has any undelivered messages to it
             // if so, send these messages, and remove user from mapping of logged-out users
@@ -383,6 +402,8 @@ int main(int argc, char *argv[]) {
                     continue;
                 } else if (operation == '3') { //delete account
                     deleteAccount(sd, client_socket, sender_username, active_users, account_set, logged_out_users, i);
+                    sendAccountDeletion(sender_username, backup_servers[1], bytesWritten);
+                    sendAccountDeletion(sender_username, backup_servers[2], bytesWritten);
                     continue;
                 }
 
@@ -407,6 +428,7 @@ int main(int argc, char *argv[]) {
                     sendMessage(username, message, sender_username, client_socket, bytesWritten, active_users, logged_out_users, i);
                     // "username" here is recipient username
                     sendBackupMessage(username, message, sender_username, backup_servers[1], bytesWritten);
+                    sendBackupMessage(username, message, sender_username, backup_servers[2], bytesWritten);
 
                     // TODO: implement waiting on acknowledgments from both backup machines
                 }

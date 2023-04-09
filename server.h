@@ -71,6 +71,20 @@ string sendBackupMessage(
     return message;
 }
 
+string sendAccountCreation(string username, int backupfd, int &byteswritten) {
+    printf("Letting backup server know that an account has been made \n");
+    message = "1 " + username + "\n"  // 1 = account created
+    bytesWritten = send(backupfd, message.c_str(), strlen(message.c_str()), 0);
+    return message;
+}
+
+string sendAccountDeletion(string username, int backupfd, int &bytesWritten) {
+    printf("Letting backup server know that an account has been deleted \n");
+    message = "2 " + username + "\n" // 2 = account deleted
+    bytesWritten = send(backupfd, message.c_str(), strlen(message.c_str()), 0);
+    return message;
+}
+
 string sendBackupTerminationMessage(int backupfd) {
     string message = "primary died";
     int bytesWritten = send(backupfd, message.c_str(), strlen(message.c_str()), 0);
