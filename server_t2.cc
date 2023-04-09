@@ -80,9 +80,10 @@ void sigabrtHandlerPrimary(int signum) {
 }
 
 // function that is run (through a thread) when this machine is a backup server
-void backup(char msg[1500], hostent* host, int port) {
+void backup(hostent* host, int port) {
 
     printf("Entered backup thread\n");
+    char msg[1500];
 
     // register signal handlers
     signal(SIGINT, sigintHandler);
@@ -118,6 +119,15 @@ void backup(char msg[1500], hostent* host, int port) {
     memset(&msg, 0, sizeof(msg)); // clear the buffer
 
     cout << "Connected to the server!" << endl;
+
+    // send to the primary server an indication that this is a backup server, NOT a client
+    // clients are not allowed to specify "\n" as their username, so this is a safe guard
+    string username = "\n";
+    strcpy(msg, username.c_str());
+
+    // send client username to server
+    int usernameBytes = send(primarySd_backup, (char*)&msg, strlen(msg), 0);
+    memset(&msg, 0, sizeof(msg)); // clear the buffer again
 
     int bytesRead, bytesWritten = 0;
 
@@ -171,6 +181,17 @@ void backup(char msg[1500], hostent* host, int port) {
                 cout<<"[Backup] Error connecting to primary server socket"<<endl;
                 exit(0);
             }
+            // tell the new primary server that this backup is connected to them now
+            memset(&msg, 0, sizeof(msg)); // clear the buffer
+
+            // send to the primary server an indication that this is a backup server, NOT a client
+            // clients are not allowed to specify "\n" as their username, so this is a safe guard
+            string username = "\n";
+            strcpy(msg, username.c_str());
+
+            // send client username to server
+            int usernameBytes = send(primarySd_backup, (char*)&msg, strlen(msg), 0);
+            memset(&msg, 0, sizeof(msg)); // clear the buffer again
         }
 
         // parse message (incoming from primary server) for
@@ -217,10 +238,8 @@ int main(int argc, char *argv[]) {
         char *serverIp = argv[1]; 
         //setup a socket and connection tools 
         struct hostent* host = gethostbyname(serverIp); 
-        std::thread t(backup, msg, host, port);
+        std::thread t(backup, host, port);
         t.join();
-        backup_servers[1] = 0;
-        backup_servers[2] = 0;
         sleep(1);
     }
 
@@ -327,7 +346,12 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);  
             }
 
-            if (num_backup_connections <= 1) {
+            // ask client for username (client will send upon connecting to the server)
+            memset(&msg, 0, sizeof(msg)); // clear the buffer
+            recv(new_socket, (char*)&msg, sizeof(msg), 0);
+            std::string new_client_username(msg);
+
+            if (num_backup_connections <= 1 && !strcmp(new_client_username.c_str(), "\n")) {
                 backup_servers[num_backup_connections + 1] = new_socket;
                 // inform server of backup server socket number
                 // used in send and receive commands 
@@ -338,10 +362,10 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            // ask client for username (client will send upon connecting to the server)
-            memset(&msg, 0, sizeof(msg)); // clear the buffer
-            recv(new_socket, (char*)&msg, sizeof(msg), 0);
-            std::string new_client_username(msg);
+            // // ask client for username (client will send upon connecting to the server)
+            // memset(&msg, 0, sizeof(msg)); // clear the buffer
+            // recv(new_socket, (char*)&msg, sizeof(msg), 0);
+            // std::string new_client_username(msg);
 
             if (active_users.find(new_client_username) != active_users.end()) {
                 int existing_login_sd = active_users[new_client_username];
