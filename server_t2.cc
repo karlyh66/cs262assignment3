@@ -74,6 +74,28 @@ void sigintHandler(int signum) {
     }
 }
 
+void sigintHandlerBackup(int signum) {
+    // if a backup server fails or crashes, close the socket connection
+    cout << "Interrupt signal (" << signum << ") received.\n";
+    printf("primarySd_backup: %d\n", primarySd_backup);
+    // tell the primary server that a backup server died, so decrement the number of backup server connections
+    char msg[1500];
+    memset(&msg, 0, sizeof(msg)); // clear the buffer
+
+    // send to the primary server an indication that this backup server is about to die
+    string backup_crash_msg = "backup died. please decrement num_backup_connections";
+    strcpy(msg, backup_crash_msg.c_str());
+
+    // send client username to server
+    int backup_crash_msg_bytes = send(primarySd_backup, (char*)&msg, strlen(msg), 0);
+    memset(&msg, 0, sizeof(msg)); // clear the buffer again
+
+    close(primarySd_backup);
+    primarySd_backup = 0;
+
+    exit(signum);
+}
+
 // sigabrthandler for when this machine is the primary server
 void sigabrtHandlerPrimary(int signum) {
     cout << "Interrupt signal (" << signum << ") received.\n";
@@ -86,7 +108,7 @@ void backup(hostent* host, int port) {
     char msg[1500];
 
     // register signal handlers
-    signal(SIGINT, sigintHandler);
+    signal(SIGINT, sigintHandlerBackup);
 
     // backup server socket address
     sockaddr_in sendSockAddr;   
@@ -256,8 +278,8 @@ int main(int argc, char *argv[]) {
     servAddr.sin_port = htons(port);
 
     // serverSd: master socket
-    int serverSd, addrlen, new_socket , client_socket[10] , 
-          max_clients = 10 , curr_clients = 0, activity, i , valread , sd;
+    int serverSd, addrlen, new_socket , client_socket[12] , 
+          max_clients = 12 , curr_clients = 0, activity, i , valread , sd;
 
     int max_sd; 
     
@@ -298,7 +320,7 @@ int main(int argc, char *argv[]) {
 
 
     // listen for up to 10 requests at a time
-    listen(serverSd, 10);
+    listen(serverSd, 12);
     // receive a request from client using accept
     // we need a new address to connect with the client
     sockaddr_in newSockAddr;
@@ -347,6 +369,7 @@ int main(int argc, char *argv[]) {
             }
 
             // ask client for username (client will send upon connecting to the server)
+            // if username is "\n", then we have a backup server connection, NOT a client connection
             memset(&msg, 0, sizeof(msg)); // clear the buffer
             recv(new_socket, (char*)&msg, sizeof(msg), 0);
             std::string new_client_username(msg);
@@ -355,52 +378,54 @@ int main(int argc, char *argv[]) {
                 backup_servers[num_backup_connections + 1] = new_socket;
                 // inform server of backup server socket number
                 // used in send and receive commands 
-                printf("New backup server connection , socket fd is %d, ip is: %s, port: %d\n",
-                new_socket, inet_ntoa(newSockAddr.sin_addr), ntohs
-                  (newSockAddr.sin_port));
                 num_backup_connections++;
-                continue;
+                printf("New backup server connection , socket fd is %d, ip is: %s, port: %d, num_backup_connections: %d\n",
+                new_socket, inet_ntoa(newSockAddr.sin_addr), ntohs
+                  (newSockAddr.sin_port), num_backup_connections);
             }
 
-            // // ask client for username (client will send upon connecting to the server)
-            // memset(&msg, 0, sizeof(msg)); // clear the buffer
-            // recv(new_socket, (char*)&msg, sizeof(msg), 0);
-            // std::string new_client_username(msg);
+            // if we have a CLIENT connection, NOT a backup server connection
+            if (strcmp(new_client_username.c_str(), "\n") != 0) {
 
-            if (active_users.find(new_client_username) != active_users.end()) {
-                int existing_login_sd = active_users[new_client_username];
-                memset(&msg, 0, sizeof(msg));
-                const char* force_logout_msg = "Another user logged in as your name, so logging you out.";
-                strcpy(msg, force_logout_msg);
-                send(existing_login_sd, (char*)&msg, sizeof(msg), 0);
-            }
-            account_set.insert(new_client_username);
-            active_users[new_client_username] = new_socket;
-            // send information about this new account creation to the backup servers
-            if (backup_servers[1]) {
-                sendAccountCreation(new_client_username, backup_servers[1]);
-            }
-            if (backup_servers[2]) {
-                sendAccountCreation(new_client_username, backup_servers[2]);
-            }
+                if (active_users.find(new_client_username) != active_users.end()) {
+                    int existing_login_sd = active_users[new_client_username];
+                    memset(&msg, 0, sizeof(msg));
+                    const char* force_logout_msg = "Another user logged in as your name, so logging you out.";
+                    strcpy(msg, force_logout_msg);
+                    send(existing_login_sd, (char*)&msg, sizeof(msg), 0);
+                }
+                account_set.insert(new_client_username);
+                active_users[new_client_username] = new_socket;
+                // send information about this new account creation to the backup servers
+                if (backup_servers[1]) {
+                    sendAccountCreation(new_client_username, backup_servers[1]);
+                }
+                if (backup_servers[2]) {
+                    sendAccountCreation(new_client_username, backup_servers[2]);
+                }
 
-            // check whether this user has any undelivered messages to it
-            // if so, send these messages, and remove user from mapping of logged-out users
-            // this means the user has logged in previously
-            auto it_check_undelivered = logged_out_users.find(new_client_username);
-            if (it_check_undelivered != logged_out_users.end()) {
-                string undelivered_messages = it_check_undelivered->second;
-                memset(&msg, 0, sizeof(msg)); //clear the buffer
-                strcpy(msg, undelivered_messages.c_str());
-                send(new_socket, undelivered_messages.c_str(), strlen(undelivered_messages.c_str()), 0);
-            }
+                // check whether this user has any undelivered messages to it
+                // if so, send these messages, and remove user from mapping of logged-out users
+                // this means the user has logged in previously
+                auto it_check_undelivered = logged_out_users.find(new_client_username);
+                if (it_check_undelivered != logged_out_users.end()) {
+                    string undelivered_messages = it_check_undelivered->second;
+                    memset(&msg, 0, sizeof(msg)); //clear the buffer
+                    strcpy(msg, undelivered_messages.c_str());
+                    send(new_socket, undelivered_messages.c_str(), strlen(undelivered_messages.c_str()), 0);
+                }
 
-            // inform server of socket number - used in send and receive commands 
-            printf("New client connection , socket fd is %d, username is %s, ip is: %s, port: %d\n",
-            new_socket, msg, inet_ntoa(newSockAddr.sin_addr), ntohs
-                  (newSockAddr.sin_port));
+                // inform server of socket number - used in send and receive commands 
+                printf("New client connection , socket fd is %d, username is %s, ip is: %s, port: %d\n",
+                new_socket, msg, inet_ntoa(newSockAddr.sin_addr), ntohs
+                    (newSockAddr.sin_port));
+
+            }
 
             // add new socket to array of sockets 
+            // this code now applies to ALL connections - backup server and client
+            // we add backup server connections to the client_socket set as well,
+            //    so that the primary server can hear when a backup server crashes
             for (i = 0; i < max_clients; i++)  
             {  
                 // if position is empty 
@@ -427,7 +452,16 @@ int main(int argc, char *argv[]) {
                 bytesRead = recv(sd, (char*)&msg, sizeof(msg), 0);
                 string msg_string(msg);
                 printf("msg string: %s\n", msg_string.c_str());
-                
+
+                // check if this  message is meant to tell primary server that a backup has died
+                if (!strcmp(msg_string.c_str(), "backup died. please decrement num_backup_connections")) {
+                    num_backup_connections--;
+                    printf("A backup has died. num_backup_connections: %d\n", num_backup_connections);
+                    close(sd);
+                    client_socket[i] = 0;
+                    continue;
+                }
+
                 char operation = msg_string[0];
 
                 // handle finding the username of the sender (of message or operation)
