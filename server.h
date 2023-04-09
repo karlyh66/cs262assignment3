@@ -91,12 +91,12 @@ string sendBackupTerminationMessage(int backupfd) {
     return message;
 }
 
-string sendAck(int primary_fd, int self_id, int &bytesWritten) {
-    printf("Acknowledging message received from primary server. \n");
-    string message = "Acknowledgement from " + self_id;
-    bytesWritten = send(primary_fd, message.c_str(), strlen(message.c_str()), 0);
-    return message;
-}
+// string sendAck(int primary_fd, int self_id, int &bytesWritten) {
+//     printf("Acknowledging message received from primary server. \n");
+//     string message = "Acknowledgement from " + self_id;
+//     bytesWritten = send(primary_fd, message.c_str(), strlen(message.c_str()), 0);
+//     return message;
+// }
 
 // allows a user to check which accounts exist, including logged out ones, that contain a wildcard
 string listAccounts(string wildcard, int* client_socket, int &bytesWritten, \
