@@ -21,6 +21,8 @@ Initial ideas:
 =============================================
 - Implemented some version of backup server acknowledgement 
 - Implemented the primary server sending a log entry to the backup servers, and the backup server parsing that entry
+- Implemented backup servers updating their state when users connected to primary server create an account, delete account,
+  or send messages to other users.
 TODO:
 - Integrate primary server and backup server implementation into one program (through threading)
 
