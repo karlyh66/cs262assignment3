@@ -55,8 +55,8 @@ void listener_thread(int sd, int bytes_read) {
 int main(int argc, char *argv[])
 {
     //we need 2 things: ip address and port number, in that order
-    if(argc != 4){
-        cerr << "Usage: ip_address port username" << endl; exit(0); 
+    if (argc != 4 || !strcmp(argv[3], "\n")) {
+        cerr << "Usage: ip_address port username. Username cannot be the backslash n character." << endl; exit(0); 
     } //grab the IP address and port number 
     char *serverIp = argv[1]; 
     int port = atoi(argv[2]); 
