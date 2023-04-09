@@ -117,7 +117,7 @@ void backup(char msg[1500], hostent* host, int port) {
 
         string msg_string(msg_recv);
 
-        if (!strcmp(msg_string.substr(0,1).c_str(), "1")) {
+        if (!strcmp(msg_string.substr(0,1).c_str(), "0")) {
             printf("\nAccount created\n");
             string username = msg_string.substr(2, msg_string.length() - 3);
             printf("username: %s\n", username.c_str());
@@ -125,7 +125,7 @@ void backup(char msg[1500], hostent* host, int port) {
             continue;
         }
 
-        if (!strcmp(msg_string.substr(0,1).c_str(), "2")) {
+        if (!strcmp(msg_string.substr(0,1).c_str(), "3")) {
             printf("\nAccount deleted\n");
             string username = msg_string.substr(2, msg_string.length() - 3);
             printf("username: %s\n", username.c_str());
