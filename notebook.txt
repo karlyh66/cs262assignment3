@@ -46,3 +46,16 @@ TODO:
 - Handle what happens when there is only one primary server + one backup up
     - Disallow a client from joining before the second backup server comes up
 - Handle the case where client does Ctrl+C
+
+4/9 (Sun) afternoon
+=============================================
+- Handled what happens when one *backup* server fails or crashes
+    - Originally, in our implementation, the backup server could not talk to the primary server
+        - We worked around this by adding the backup server to the clientfds fd_set, so that the primary server can listen for messages from it too
+- Handled what happens when there is only one primary server + one backup up
+    - Disallowed a client from joining before the second backup server comes up
+    - In general, the primary server can discern when an incoming connection is from a backup server, and when it is from a client
+        - And these can happen out of order!
+TODO:
+- Handle the case where client does Ctrl+C
+- After server goes down and client logs back in, send client the entire log associated with that client
