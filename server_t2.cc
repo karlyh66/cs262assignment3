@@ -141,7 +141,7 @@ void backup(char msg[1500], hostent* host, int port) {
         if (!strcmp(msg_recv, "primary died, but you are still backup")) {
             // reconnect to the primary
             close(primarySd_backup);
-            sleep(7);
+            sleep(3);
             primarySd_backup = socket(AF_INET, SOCK_STREAM, 0);
             // server address
             // sockaddr_in sendSockAddr2;   
@@ -189,7 +189,6 @@ int main(int argc, char *argv[]) {
     if(argc != 4) {
         cerr << "Usage: ip_address port is_primary (1/0)" << endl; exit(0); 
     } //grab the IP address and port number 
-    char *serverIp = argv[1]; 
     int port = atoi(argv[2]); 
     is_primary = atoi(argv[3]);
     printf("is_primary: %d\n", is_primary);
@@ -197,19 +196,19 @@ int main(int argc, char *argv[]) {
 
     //create a message buffer 
     char msg[1500]; 
-    //setup a socket and connection tools 
-    struct hostent* host = gethostbyname(serverIp); 
-
-
+    
     // THREAD OFF INTO BACKUP
     // TODO: guard this with the is_primary boolean
 
     if (!is_primary) {
+        char *serverIp = argv[1]; 
+        //setup a socket and connection tools 
+        struct hostent* host = gethostbyname(serverIp); 
         std::thread t(backup, msg, host, port);
         t.join();
         backup_servers[1] = 0;
         backup_servers[2] = 0;
-        sleep(4);
+        sleep(1);
     }
 
     printf("THIS SERVER IS NOW THE PRIMARY\n");
@@ -226,7 +225,7 @@ int main(int argc, char *argv[]) {
 
     // serverSd: master socket
     int serverSd, addrlen, new_socket , client_socket[10] , 
-          max_clients = 12 , curr_clients = 0, activity, i , valread , sd;
+          max_clients = 10 , curr_clients = 0, activity, i , valread , sd;
 
     int max_sd; 
     
@@ -251,7 +250,7 @@ int main(int argc, char *argv[]) {
     int iSetOption = 1;
     if( setsockopt(serverSd, SOL_SOCKET, SO_REUSEADDR, (char *)&iSetOption, 
           sizeof(iSetOption)) < 0 )  
-    {  
+    {
         perror("setsockopt");  
         exit(EXIT_FAILURE);  
     }
@@ -336,12 +335,16 @@ int main(int argc, char *argv[]) {
                 const char* force_logout_msg = "Another user logged in as your name, so logging you out.";
                 strcpy(msg, force_logout_msg);
                 send(existing_login_sd, (char*)&msg, sizeof(msg), 0);
-            } else {
-                account_set.insert(new_client_username);
-                sendAccountCreation(new_client_username, backup_servers[1]);
-                sendAccountCreation(new_client_username, backup_servers[2]);
             }
+            // else {
+            //     account_set.insert(new_client_username);
+            //     // sendAccountCreation(new_client_username, backup_servers[1]);
+            //     // sendAccountCreation(new_client_username, backup_servers[2]);
+            // }
+            account_set.insert(new_client_username);
             active_users[new_client_username] = new_socket;
+            sendAccountCreation(new_client_username, backup_servers[1]);
+            sendAccountCreation(new_client_username, backup_servers[2]);
 
             // check whether this user has any undelivered messages to it
             // if so, send these messages, and remove user from mapping of logged-out users
@@ -398,7 +401,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                if (operation == '4') { //quit 
+                if (operation == '4') { //quit
                     quitUser(sd, client_socket, newSockAddr, newSockAddrSize, sender_username, active_users, logged_out_users, i);
                     continue;
                 } else if (operation == '3') { //delete account
@@ -424,6 +427,11 @@ int main(int argc, char *argv[]) {
                 pending_log[sender_username] = pending_log[sender_username] + "To " + username + ": " + message + "\n";
 
                 if (operation == '2') { // list accounts
+                    printf("List accounts request received. Below are the accounts:\n");
+                    for (std::string a : account_set)
+                    {
+                        printf("%s\n", a.c_str());
+                    }
                     listAccounts(message, client_socket, bytesWritten, account_set, i);
                 } else if (operation == '1') { // send message
                     sendMessage(username, message, sender_username, client_socket, bytesWritten, active_users, logged_out_users, i);
@@ -435,59 +443,5 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-    }
-
-
-    // int primarySd = socket(AF_INET, SOCK_STREAM, 0);
-    // //try to connect...
-    // int status = connect(primarySd,(sockaddr*) &sendSockAddr, sizeof(sendSockAddr));
-    // if(status < 0)
-    // {
-    //     cout<<"Error connecting to socket"<<endl;
-    //     exit(0);
-    // }
-
-    // memset(&msg, 0, sizeof(msg)); //clear the buffer
-
-    // cout << "Connected to the server!" << endl;
-
-    // int bytesRead, bytesWritten = 0;
-
-    // // listener portion
-    // // TODO: change the code so that server2 listens to server1
-    // while(1) {
-    //     // create a message buffer for the message to be received
-    //     char msg_recv[1500]; 
-    //     // reading from server
-    //     memset(&msg_recv, 0, sizeof(msg_recv)); // clear the buffer
-    //     bytesRead += recv(primarySd, (char*)&msg_recv, sizeof(msg_recv), 0);
-        
-    //     // parse this string for sender username, receipient username, and actual message body
-    //     string msg_string(msg_recv);
-
-    //     printf("full msg string: %s\n", msg_string.c_str());
-
-    //     size_t pos1 = msg_string.find('\n');
-    //     size_t pos2 = msg_string.find('\n', pos1 + 1);
-    //     printf("pos1: %zu\n", pos1);
-    //     printf("pos2: %zu\n", pos2);
-
-    //     string sender = msg_string.substr(0, pos1);
-
-    //     string recipient = msg_string.substr(pos1 + 1, pos2 - pos1 - 1);
-    //     printf("sender username: %s\n", sender.c_str());
-    //     printf("recipient username: %s\n", recipient.c_str());
-    //     string message = msg_string.substr(pos2 + 1, msg_string.length() - pos2);
-    //     printf("message: %s\n", message.c_str());
-    //     printf("message length: %lu\n", strlen(message.c_str()));
-
-    //     // TODO: store these pieces into the pending_log map through an internal update
-    //     pending_log[recipient] = pending_log[recipient] + "From " + sender + ": " + message + "\n";
-    //     pending_log[sender] = pending_log[sender] + "To " + recipient + ": " + message + "\n";
-    //     // send acknowledgement to primary server
-    //     sendAck(primarySd, selfId, bytesWritten);
-    // }
-
-    cout << "Connection closed" << endl;
-    return 0;    
+    } 
 }
