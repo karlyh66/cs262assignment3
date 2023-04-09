@@ -115,17 +115,19 @@ void backup(char msg[1500], hostent* host, int port) {
         memset(&msg_recv, 0, sizeof(msg_recv)); // clear the buffer
         bytesRead += recv(primarySd_backup, (char*)&msg_recv, sizeof(msg_recv), 0);
 
-        if (!strcmp(msg_recv[0], 1)) {
+        string msg_string(msg_recv);
+
+        if (!strcmp(msg_string.substr(0,1).c_str(), "1")) {
             printf("\nAccount created\n");
-            string username = msg_recv.substr(2, length(msg_recv) - 3);
+            string username = msg_string.substr(2, msg_string.length() - 3);
             printf("username: %s\n", username.c_str());
             account_set.insert(username);
             return;
         }
 
-        if (!strcmp(msg_recv[0], 2)) {
+        if (!strcmp(msg_string.substr(0,1).c_str(), "2")) {
             printf("\nAccount deleted\n");
-            string username = msg_recv.substr(2, length(msg_recv) - 3);
+            string username = msg_string.substr(2, msg_string.length() - 3);
             printf("username: %s\n", username.c_str());
             account_set.erase(username);
             return;
@@ -156,7 +158,6 @@ void backup(char msg[1500], hostent* host, int port) {
         }
 
         // parse this string for sender username, receipient username, and actual message body
-        string msg_string(msg_recv);
 
         printf("full msg string: %s\n", msg_string.c_str());
 
@@ -337,8 +338,8 @@ int main(int argc, char *argv[]) {
                 send(existing_login_sd, (char*)&msg, sizeof(msg), 0);
             } else {
                 account_set.insert(new_client_username);
-                sendAccountCreation(sender_username, backup_servers[1], bytesWritten);
-                sendAccountCreation(sender_username, backup_servers[2], bytesWritten);
+                sendAccountCreation(new_client_username, backup_servers[1]);
+                sendAccountCreation(new_client_username, backup_servers[2]);
             }
             active_users[new_client_username] = new_socket;
 
@@ -397,13 +398,13 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                if (operation == '4'){ //quit 
+                if (operation == '4') { //quit 
                     quitUser(sd, client_socket, newSockAddr, newSockAddrSize, sender_username, active_users, logged_out_users, i);
                     continue;
                 } else if (operation == '3') { //delete account
                     deleteAccount(sd, client_socket, sender_username, active_users, account_set, logged_out_users, i);
-                    sendAccountDeletion(sender_username, backup_servers[1], bytesWritten);
-                    sendAccountDeletion(sender_username, backup_servers[2], bytesWritten);
+                    sendAccountDeletion(sender_username, backup_servers[1]);
+                    sendAccountDeletion(sender_username, backup_servers[2]);
                     continue;
                 }
 
