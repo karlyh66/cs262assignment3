@@ -33,17 +33,68 @@ std::unordered_map<std::string, std::vector<std::pair<std::string, std::string>>
 std::unordered_map<std::string, std::string> logged_out_users;                                  // username : undelivered messages
 std::set<std::string> account_set;                                                              // all usernames (both logged in AND not logged in)
 
+void recoverState()
+{
+    // read commit log from file and update account_set, chat_history
+    std::ifstream commit_log_file;
+    commit_log_file.open("commit_log_" + std::to_string(selfId) + ".txt");
 
-void recoverState() {
+    std::string line;
 
+    while (std::getline(commit_log_file, line))
+    {
+
+        std::string commandID = line.substr(0, line.find(":"));
+        line = line.substr(0, line.find("\n")); // remove new line character
+        line = line.substr(line.find(":") + 1); // remove commandID
+
+        commit_log[std::stoi(commandID)] = line; // update commit log object
+
+        std::string command = line.substr(0, 1); // first character of line is the command
+
+        if (command == "C")
+        {
+            std::string username = line.substr(line.find("|") + 1);
+            account_set.insert(username);
+        }
+
+        else if (command == "D")
+        {
+            std::string username = line.substr(line.find("|") + 1);
+            account_set.erase(username); // assuming that by sequence of commands, an account is created before it is deleted
+        }
+
+        else if (command == "M")
+        {
+            size_t pos1 = line.find("|") + 1;
+            size_t pos2 = line.find("|", pos1) + 1;
+            size_t pos3 = line.find("|", pos2) + 1;
+            std::string sender = line.substr(pos1, pos2 - pos1 - 1);
+            std::string receiver = line.substr(pos2, pos3 - pos2 - 1);
+            std::string message = line.substr(pos3);
+
+            // Update chat history
+            std::pair<std::string, std::string> message_pair = std::make_pair(sender, message); // sender : message
+
+            if (chat_history.find(receiver) == chat_history.end()) // if receiver has no chat history
+            {
+                std::vector<std::pair<std::string, std::string>> message_history; // vector of sender : message pairs
+                message_history.push_back(message_pair);                         // add message to message history
+                chat_history.insert(std::make_pair(receiver, message_history));  // add message history for receiver
+            }
+            else 
+            {
+                chat_history[receiver].push_back(message_pair);
+            }
+        }
+    }
 }
-
 
 // write commit log to file
 void writeCommitLogToFile(int sd)
 {
     ofstream commit_log_file;
-    commit_log_file.open("commit_log_" + std::to_string(sd) + ".txt", std::ios_base::app); // open file in append mode
+    commit_log_file.open("commit_log_" + std::to_string(sd) + ".txt"); // , std::ios_base::app); // open file in append mode
     for (auto it = commit_log.begin(); it != commit_log.end(); ++it)
     {
         commit_log_file << it->first << ":" << it->second << endl;
@@ -52,7 +103,7 @@ void writeCommitLogToFile(int sd)
 }
 
 // adds command to log, with key being the commandID
-void insertIntoLog(std::map<int, std::string>& log, std::string command)
+void insertIntoLog(std::map<int, std::string> &log, std::string command)
 {
     // if log is empty, insert command with commandID = 1
     if (log.empty())
@@ -274,7 +325,7 @@ void backup(hostent *host, int port)
         {
             // reconnect to the primary
             close(primarySd_backup);
-            sleep(2); // sleep for 2 seconds to give the new primary time to start up
+            sleep(2);                                           // sleep for 2 seconds to give the new primary time to start up
             primarySd_backup = socket(AF_INET, SOCK_STREAM, 0); // initialize new socket object
             int status = connect(primarySd_backup, (sockaddr *)&sendSockAddr, sizeof(sendSockAddr));
             if (status < 0)
@@ -337,6 +388,7 @@ int main(int argc, char *argv[])
     is_primary = atoi(argv[3]);
     printf("is_primary: %d\n", is_primary);
     // selfId = atoi(argv[3]);
+    selfId = 0;
 
     // create a message buffer
     char msg[1500];
@@ -407,9 +459,10 @@ int main(int argc, char *argv[])
         cerr << "[Primary] Error binding socket to local address" << endl;
         exit(0);
     }
-    
+
     // recover state from log file if state is currently empty
-    if (account_set.empty()) {
+    if (account_set.empty())
+    {
         recoverState();
     }
 
@@ -498,6 +551,7 @@ int main(int argc, char *argv[])
                 {
                     // add new account to set of accounts
                     insertIntoLog(commit_log, "C|" + new_client_username);
+                    writeCommitLogToFile(selfId);
                     account_set.insert(new_client_username);
                 }
                 active_users[new_client_username] = new_socket;
@@ -514,7 +568,8 @@ int main(int argc, char *argv[])
 
                 // display chat history for this user, if it exists
                 auto it = chat_history.find(new_client_username);
-                if (it != chat_history.end()) {
+                if (it != chat_history.end())
+                {
                     string msg_history = "chat history for " + it->first + ":\n";
                     for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2)
                     {
@@ -606,6 +661,7 @@ int main(int argc, char *argv[])
                 else if (operation == '3')
                 { // delete account
                     insertIntoLog(commit_log, "D|" + sender_username);
+                    writeCommitLogToFile(selfId);
                     deleteAccount(sd, client_socket, sender_username, active_users, account_set, logged_out_users, i);
                     // send information about this account deletion to the backup servers
                     if (backup_servers[1])
@@ -643,7 +699,7 @@ int main(int argc, char *argv[])
                 { // send message
 
                     insertIntoLog(commit_log, "M|" + sender_username + "|" + username + "|" + message);
-                    writeCommitLogToFile(0);
+                    writeCommitLogToFile(selfId);
 
                     pair<string, string> p1 = make_pair(sender_username, message);
                     chat_history[username].push_back(p1);
