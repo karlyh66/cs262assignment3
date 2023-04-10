@@ -76,6 +76,9 @@ void recoverState()
         else if (command == "D")
         {
             std::string username = line.substr(line.find("|") + 1);
+            // if user had chat history, remove it
+            if (chat_history.find(username) != chat_history.end())
+                chat_history.erase(username);
             account_set.erase(username); // assuming that by sequence of commands, an account is created before it is deleted
         }
 
@@ -686,6 +689,8 @@ int main(int argc, char *argv[])
                 { // delete account
                     insertIntoLog(commit_log, "D|" + sender_username);
                     writeCommitLogToFile(selfId);
+                    if (chat_history.find(sender_username) != chat_history.end())
+                        chat_history.erase(sender_username);
                     deleteAccount(sd, client_socket, sender_username, active_users, account_set, logged_out_users, i);
                     // send information about this account deletion to the backup servers
                     if (backup_servers[1])
