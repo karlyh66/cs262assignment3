@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <fstream>
 #include "server.h"
+#include <map>
 using namespace std;
 
 int selfId; // server id, given when started
@@ -26,10 +27,55 @@ int primarySd_backup = 0; // socket FD for backup server's connection to primary
 clientInfo *client_info;
 std::unordered_map<std::string, int> active_users;             // username : socket id
 std::unordered_map<int, int> backup_servers;                   // map of backup server socket id's. keys: [1, 2] (indices). values: backup server socket id's
-std::unordered_map<std::string, std::string> commit_log;       // username : committed messages (in order)
-std::unordered_map<std::string, std::string> pending_log;      // username : pending messages (in order)
+std::map<int, std::string> commit_log;       // username : committed messages (in order)
+std::map<int, std::string> pending_log;      // username : pending messages (in order)
 std::unordered_map<std::string, std::string> logged_out_users; // username : undelivered messages
 std::set<std::string> account_set;                             // all usernames (both logged in AND not logged in)
+
+
+/* Write from pending log to file
+Params: sd - socket descriptor of server
+sd is used to specify which file to write to
+*/   
+void writePendingLogToFile(int sd) {
+    ofstream pending_log_file;
+    pending_log_file.open("pending_log_" + std::to_string(sd) +  ".txt", std::ios_base::app); // open file in append mode
+    for (auto it = pending_log.begin(); it != pending_log.end(); ++it) {
+        pending_log_file << it->first << ":" << it->second << endl;
+    }
+    pending_log_file.close();
+}
+
+
+/* Write from commit log to file
+Params: sd - socket descriptor of server
+sd is used to specify which file to write to
+*/ 
+void writeCommitLogToFile(int sd) {
+    ofstream commit_log_file;
+    commit_log_file.open("commit_log_" + std::to_string(sd) +  ".txt", std::ios_base::app); // open file in append mode
+    for (auto it = commit_log.begin(); it != commit_log.end(); ++it) {
+        commit_log_file << it->first << ":" << it->second << endl;
+    }
+    commit_log_file.close();
+}
+
+
+// adds command to log, with key being the commandID
+void insertIntoLog(std::map<int, std::string> log, std::string command) {
+    auto it = log.begin();
+
+    // if log is empty, insert command with commandID = 1
+    if (it == log.end()) {
+        log.insert(std::pair<int, std::string>(1, command));
+    } 
+    // else, insert command with sequential commandID
+    else {
+        int last_command_id = it->first;
+        log.insert(std::pair<int, std::string>(last_command_id + 1, command));
+    }
+}
+
 
 // siginthandler
 void sigintHandler(int signum)
@@ -245,8 +291,9 @@ void backup(hostent *host, int port)
         printf("message length: %lu\n", strlen(message.c_str()));
 
         // store these pieces into the pending_log map through an internal update
-        pending_log[recipient] = pending_log[recipient] + "From " + sender + ": " + message + "\n";
-        pending_log[sender] = pending_log[sender] + "To " + recipient + ": " + message + "\n";
+        // pending_log[recipient] = pending_log[recipient] + "From " + sender + ": " + message + "\n";
+        // pending_log[sender] = pending_log[sender] + "To " + recipient + ": " + message + "\n";
+
         // send acknowledgement to primary server
         // sendAck(primarySd, selfId, bytesWritten);
     }
@@ -395,6 +442,7 @@ int main(int argc, char *argv[])
             recv(new_socket, (char *)&msg, sizeof(msg), 0);
             std::string new_client_username(msg);
 
+            // if we have a BACKUP SERVER connection (only up to 2 backup servers)
             if (num_backup_connections <= 1 && !strcmp(new_client_username.c_str(), "\n"))
             {
                 backup_servers[num_backup_connections + 1] = new_socket;
@@ -534,8 +582,11 @@ int main(int argc, char *argv[])
                 printf("message length: %lu\n", strlen(message.c_str()));
 
                 // updating within the backup (internal)
-                pending_log[username] = pending_log[username] + "From " + sender_username + ": " + message + "\n";
-                pending_log[sender_username] = pending_log[sender_username] + "To " + username + ": " + message + "\n";
+                // pending_log[username] = pending_log[username] + "From " + sender_username + ": " + message + "\n";
+                // pending_log[sender_username] = pending_log[sender_username] + "To " + username + ": " + message + "\n";
+
+                insertIntoLog(pending_log, "From " + sender_username + ": " + message);
+                writePendingLogToFile(0);
 
                 if (operation == '2')
                 { // list accounts
