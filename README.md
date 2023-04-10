@@ -76,4 +76,4 @@ In our array of client socket descriptors, we can listen for activity on all of 
 We still use threading, though, on top of select(): in our client code, there is a second thread that listens for incoming server activity (while the main program handles user input). If a client program is forced to quit (either because of a forced log out by another login of the same username, or by abnormal server exit), the listener thread receives that and is responsible for alerting the main thread and having that thread quit as well.
 
 ## Unit testing
-We implemented unit tests... FINISH WRITING THIS.
+We implemented unit tests with the help of GoogleTest. You can find installation instructions [here](https://google.github.io/googletest/quickstart-cmake.html) and an introduction to writing GoogleTests [here](https://google.github.io/googletest/primer.html). 
