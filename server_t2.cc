@@ -750,13 +750,17 @@ int main(int argc, char *argv[])
                 }
                 else if (operation == '1')
                 { // send message
+                    string res = sendMessage(username, message, sender_username, client_socket, bytesWritten, active_users, logged_out_users, i);
+                    // if message was successfully sent, add to commit log and chat history, and write to file
+                    if (res.compare("")) {
+                        insertIntoLog(commit_log, "M|" + sender_username + "|" + username + "|" + message);
+                        writeCommitLogToFile(selfId);
 
-                    insertIntoLog(commit_log, "M|" + sender_username + "|" + username + "|" + message);
-                    writeCommitLogToFile(selfId);
+                        pair<string, string> p1 = make_pair(sender_username, message);
+                        chat_history[username].push_back(p1);
+                    }
 
-                    pair<string, string> p1 = make_pair(sender_username, message);
-                    chat_history[username].push_back(p1);
-
+                    // DEBUGGING - print chat history
                     for (auto it = chat_history.begin(); it != chat_history.end(); ++it)
                     {
                         printf("chat history for %s:\n", it->first.c_str());
@@ -767,7 +771,6 @@ int main(int argc, char *argv[])
                         printf("\n");
                     }
 
-                    sendMessage(username, message, sender_username, client_socket, bytesWritten, active_users, logged_out_users, i);
                     // "username" here is recipient username
                     if (backup_servers[1])
                     {
