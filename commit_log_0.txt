@@ -1,0 +1,22 @@
+1:C|adam
+2:C|moe
+3:M|moe|adam|whaddup
+4:M|moe|adam|how r u buddy
+1:C|adam
+2:C|moe
+3:M|adam|moe|hey moe
+1:C|adam
+2:C|moe
+3:M|adam|moe|hey moe
+4:M|adam|moe|its me, adam
+1:C|adam
+2:C|moe
+3:M|adam|moe|hey moe
+4:M|adam|moe|its me, adam
+5:M|moe|adam|what up dawg
+1:C|adam
+2:C|moe
+3:M|adam|moe|hey moe
+4:M|adam|moe|its me, adam
+5:M|moe|adam|what up dawg
+6:M|moe|adam|how r u

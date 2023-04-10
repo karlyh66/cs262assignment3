@@ -19,18 +19,61 @@
 #include <fstream>
 #include "server.h"
 #include <map>
+#include <vector>
 using namespace std;
 
 int selfId; // server id, given when started
 bool is_primary = false;
 int primarySd_backup = 0; // socket FD for backup server's connection to primary server
 clientInfo *client_info;
-std::unordered_map<std::string, int> active_users;             // username : socket id
-std::unordered_map<int, int> backup_servers;                   // map of backup server socket id's. keys: [1, 2] (indices). values: backup server socket id's
-std::map<int, std::string> commit_log;                         // username : committed messages (in order)
-std::map<int, std::string> pending_log;                        // username : pending messages (in order)
-std::unordered_map<std::string, std::string> logged_out_users; // username : undelivered messages
-std::set<std::string> account_set;                             // all usernames (both logged in AND not logged in)
+std::unordered_map<std::string, int> active_users;                                              // username : socket id
+std::unordered_map<int, int> backup_servers;                                                    // map of backup server socket id's. keys: [1, 2] (indices). values: backup server socket id's
+std::map<int, std::string> commit_log;                                                          // commandID : commands (in order)
+std::unordered_map<std::string, std::vector<std::pair<std::string, std::string>>> chat_history; // username : vector of messages history
+std::unordered_map<std::string, std::string> logged_out_users;                                  // username : undelivered messages
+std::set<std::string> account_set;                                                              // all usernames (both logged in AND not logged in)
+
+
+void recoverState() {
+
+}
+
+
+// write commit log to file
+void writeCommitLogToFile(int sd)
+{
+    ofstream commit_log_file;
+    commit_log_file.open("commit_log_" + std::to_string(sd) + ".txt", std::ios_base::app); // open file in append mode
+    for (auto it = commit_log.begin(); it != commit_log.end(); ++it)
+    {
+        commit_log_file << it->first << ":" << it->second << endl;
+    }
+    commit_log_file.close();
+}
+
+// adds command to log, with key being the commandID
+void insertIntoLog(std::map<int, std::string>& log, std::string command)
+{
+    // if log is empty, insert command with commandID = 1
+    if (log.empty())
+    {
+        log.insert(std::pair<int, std::string>(1, command));
+        // for (auto it = log.begin(); it != log.end(); ++it)
+        // {
+        //     printf("key: %d, value: %s\n", it->first, it->second.c_str());
+        // }
+        // printf("First command inserted into log: %s\n", command.c_str());
+    }
+    // else, insert command with sequential commandID
+    else
+    {
+        auto it = log.end();
+        it--;
+        int last_command_id = it->first;
+        // printf("last command id: %d", last_command_id);
+        log.insert(std::pair<int, std::string>(last_command_id + 1, command));
+    }
+}
 
 // siginthandler
 void sigintHandler(int signum)
@@ -231,13 +274,14 @@ void backup(hostent *host, int port)
         {
             // reconnect to the primary
             close(primarySd_backup);
-            sleep(2);
+            sleep(2); // sleep for 2 seconds to give the new primary time to start up
             primarySd_backup = socket(AF_INET, SOCK_STREAM, 0); // initialize new socket object
             int status = connect(primarySd_backup, (sockaddr *)&sendSockAddr, sizeof(sendSockAddr));
             if (status < 0)
             {
                 cout << "[Backup] Error connecting to primary server socket" << endl;
-                exit(0);
+                is_primary = 1;
+                return;
             }
             // tell the new primary server that this backup is connected to them now
             memset(&msg, 0, sizeof(msg)); // clear the buffer
@@ -270,6 +314,9 @@ void backup(hostent *host, int port)
         // store these pieces into the pending_log map through an internal update
         // pending_log[recipient] = pending_log[recipient] + "From " + sender + ": " + message + "\n";
         // pending_log[sender] = pending_log[sender] + "To " + recipient + ": " + message + "\n";
+        pair<string, string> p1 = make_pair(sender, message);
+
+        chat_history[recipient].push_back(p1);
 
         // send acknowledgement to primary server
         // sendAck(primarySd, selfId, bytesWritten);
@@ -321,7 +368,7 @@ int main(int argc, char *argv[])
 
     // serverSd: master socket
     int serverSd, addrlen, new_socket, client_socket[12],
-        max_clients = 12, curr_clients = 0, activity, i, valread, sd;
+        max_clients = 12, curr_clients = 0, activity, valread, sd;
 
     int max_sd;
 
@@ -329,7 +376,7 @@ int main(int argc, char *argv[])
     fd_set clientfds;
 
     // initialize all client_socket[] to 0 so not checked
-    for (i = 0; i < max_clients; i++)
+    for (int i = 0; i < max_clients; i++)
     {
         client_socket[i] = 0;
     }
@@ -360,6 +407,11 @@ int main(int argc, char *argv[])
         cerr << "[Primary] Error binding socket to local address" << endl;
         exit(0);
     }
+    
+    // recover state from log file if state is currently empty
+    if (account_set.empty()) {
+        recoverState();
+    }
 
     // listen for up to 10 requests at a time
     listen(serverSd, 12);
@@ -380,7 +432,7 @@ int main(int argc, char *argv[])
         max_sd = serverSd;
 
         // add child sockets to set
-        for (i = 0; i < max_clients; i++)
+        for (int i = 0; i < max_clients; i++)
         {
             sd = client_socket[i];
 
@@ -440,8 +492,16 @@ int main(int argc, char *argv[])
                     strcpy(msg, force_logout_msg);
                     send(existing_login_sd, (char *)&msg, sizeof(msg), 0);
                 }
-                account_set.insert(new_client_username);
+
+                // if new account is being created, add commit to log
+                if (account_set.find(new_client_username) == account_set.end())
+                {
+                    // add new account to set of accounts
+                    insertIntoLog(commit_log, "C|" + new_client_username);
+                    account_set.insert(new_client_username);
+                }
                 active_users[new_client_username] = new_socket;
+
                 // send information about this new account creation to the backup servers
                 if (backup_servers[1])
                 {
@@ -450,6 +510,19 @@ int main(int argc, char *argv[])
                 if (backup_servers[2])
                 {
                     sendAccountCreation(new_client_username, backup_servers[2]);
+                }
+
+                // display chat history for this user, if it exists
+                auto it = chat_history.find(new_client_username);
+                if (it != chat_history.end()) {
+                    string msg_history = "chat history for " + it->first + ":\n";
+                    for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2)
+                    {
+                        msg_history += "<" + it2->first + ">: " + it2->second + "\n";
+                    }
+                    memset(&msg, 0, sizeof(msg)); // clear the buffer
+                    strcpy(msg, msg_history.c_str());
+                    send(new_socket, msg_history.c_str(), strlen(msg_history.c_str()), 0);
                 }
 
                 // check whether this user has any undelivered messages to it
@@ -473,7 +546,7 @@ int main(int argc, char *argv[])
             // this code now applies to ALL connections - backup server and client
             // we add backup server connections to the client_socket set as well,
             //    so that the primary server can hear when a backup server crashes
-            for (i = 0; i < max_clients; i++)
+            for (int i = 0; i < max_clients; i++)
             {
                 // if position is empty
                 if (client_socket[i] == 0)
@@ -490,7 +563,7 @@ int main(int argc, char *argv[])
 
         // clear the buffer
         memset(&msg, 0, sizeof(msg));
-        for (i = 0; i < max_clients; i++)
+        for (int i = 0; i < max_clients; i++)
         {
 
             sd = client_socket[i];
@@ -532,6 +605,7 @@ int main(int argc, char *argv[])
                 }
                 else if (operation == '3')
                 { // delete account
+                    insertIntoLog(commit_log, "D|" + sender_username);
                     deleteAccount(sd, client_socket, sender_username, active_users, account_set, logged_out_users, i);
                     // send information about this account deletion to the backup servers
                     if (backup_servers[1])
@@ -556,10 +630,6 @@ int main(int argc, char *argv[])
                 printf("message: %s\n", message.c_str());
                 printf("message length: %lu\n", strlen(message.c_str()));
 
-                // updating within the backup (internal)
-                // pending_log[username] = pending_log[username] + "From " + sender_username + ": " + message + "\n";
-                // pending_log[sender_username] = pending_log[sender_username] + "To " + username + ": " + message + "\n";
-
                 if (operation == '2')
                 { // list accounts
                     printf("List accounts request received. Below are the accounts:\n");
@@ -571,6 +641,23 @@ int main(int argc, char *argv[])
                 }
                 else if (operation == '1')
                 { // send message
+
+                    insertIntoLog(commit_log, "M|" + sender_username + "|" + username + "|" + message);
+                    writeCommitLogToFile(0);
+
+                    pair<string, string> p1 = make_pair(sender_username, message);
+                    chat_history[username].push_back(p1);
+
+                    for (auto it = chat_history.begin(); it != chat_history.end(); ++it)
+                    {
+                        printf("chat history for %s:\n", it->first.c_str());
+                        for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2)
+                        {
+                            printf("<%s>: %s\n", it2->first.c_str(), it2->second.c_str());
+                        }
+                        printf("\n");
+                    }
+
                     sendMessage(username, message, sender_username, client_socket, bytesWritten, active_users, logged_out_users, i);
                     // "username" here is recipient username
                     if (backup_servers[1])

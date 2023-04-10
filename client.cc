@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
         && strcmp(operation.c_str(), "3")
         && strcmp(operation.c_str(), "4")
         ) {
-            string bad_operation_error = "Please enter 1 (send a message to a use), 2 (list accounts), or 3 (delete account).";
+            string bad_operation_error = "Please enter 1 (send a message to a use), 2 (list accounts), 3 (delete account) or 4 (log out).";
             printf("%s\n", bad_operation_error.c_str());
             continue;
         }

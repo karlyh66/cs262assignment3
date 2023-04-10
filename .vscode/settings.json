@@ -72,6 +72,10 @@
         "utility": "cpp",
         "variant": "cpp",
         "vector": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "__bits": "cpp",
+        "clocale": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp"
     }
 }
