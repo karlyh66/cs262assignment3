@@ -94,6 +94,7 @@ void recoverState()
             // Update chat history
             std::pair<std::string, std::string> message_pair = std::make_pair(sender, message); // sender : message
 
+            // update receiver's chat history
             if (chat_history.find(receiver) == chat_history.end()) // if receiver has no chat history
             {
                 std::vector<std::pair<std::string, std::string>> message_history; // vector of sender : message pairs
@@ -594,19 +595,42 @@ int main(int argc, char *argv[])
                 }
 
                 // display chat history for this user, if it exists
+                string msg_history = "";
                 auto it = chat_history.find(new_client_username);
                 if (it != chat_history.end())
                 {
-                    string msg_history = "chat history for " + it->first + ":\n";
+                    msg_history = "Chat history for " + it->first + ":\nMessages you received:\n";
                     for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2)
                     {
-                        msg_history += "<" + it2->first + ">: " + it2->second + "\n";
+                        msg_history += "From <" + it2->first + ">: " + it2->second + "\n";
                     }
+                }
+
+                // find messages that the user has sent to other users
+                // and display them
+                string msgs_sent = "\nMessages you sent:\n";
+                for (auto it = chat_history.begin(); it != chat_history.end(); ++it) // iterate through all users
+                {
+                    for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2) // iterate through all messages <sender, message> sent to this user
+                    {
+                        if (it2->first == new_client_username)
+                            msgs_sent += "To <" + it->first + ">: " + it2->second + "\n";
+                        
+                    }
+                }
+
+                if (!strcmp(msgs_sent.c_str(), "\nMessages you sent:\n")) // if no messages sent
+                    msgs_sent = "";
+                
+                msg_history += msgs_sent;
+
+                if (strcmp(msg_history.c_str(), "")) // if chat history exists
+                {
                     memset(&msg, 0, sizeof(msg)); // clear the buffer
                     strcpy(msg, msg_history.c_str());
                     send(new_socket, msg_history.c_str(), strlen(msg_history.c_str()), 0);
                 }
-
+                
                 // check whether this user has any undelivered messages to it
                 // if so, send these messages, and remove user from mapping of logged-out users
                 // this means the user has logged in previously

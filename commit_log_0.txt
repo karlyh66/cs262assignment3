@@ -1,4 +1,4 @@
-1:C|adam
+1:M|obama|whaddup|asdsadasd
 2:C|moe
 3:M|moe|adam|whaddup
 4:M|moe|adam|how r u budd
@@ -6,3 +6,5 @@
 6:M|jim|moe|hey moe
 7:C|obama
 8:M|adam|obama|mr president, how are we doing today
+9:M|obama|whaddup|asdsadasd
+10:C|adam
