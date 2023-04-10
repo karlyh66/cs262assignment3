@@ -41,13 +41,28 @@ void recoverState()
 
     std::string line;
 
+    // find the last commandID in the commit log
+    int last_commandID;
+    if (commit_log.end() != commit_log.begin())
+    {
+        auto it = commit_log.end();
+        it--;
+        last_commandID = it->first;
+    }
+    else
+        last_commandID = 0; 
+
+    // read commit log file line by line
     while (std::getline(commit_log_file, line))
     {
 
         std::string commandID = line.substr(0, line.find(":"));
-        line = line.substr(0, line.find("\n")); // remove new line character
+        line = line.substr(0, line.find("\n")); // remove new line character from end of line
         line = line.substr(line.find(":") + 1); // remove commandID
 
+        if (std::stoi(commandID) <= last_commandID) // if commandID in file is less than or equal to last commandID in state, skip
+            continue;
+            
         commit_log[std::stoi(commandID)] = line; // update commit log object
 
         std::string command = line.substr(0, 1); // first character of line is the command
@@ -297,7 +312,17 @@ void backup(hostent *host, int port)
             printf("\nAccount created\n");
             string username = msg_string.substr(2, msg_string.length() - 3);
             printf("username: %s\n", username.c_str());
+            insertIntoLog(commit_log, "C|" + username);
             account_set.insert(username);
+            continue;
+        }
+
+        // do nothing with existing user log in
+        if (!strcmp(msg_string.substr(0, 1).c_str(), "1"))
+        {
+            printf("\nAccount logged in\n");
+            string username = msg_string.substr(2, msg_string.length() - 3);
+            printf("username: %s\n", username.c_str());
             continue;
         }
 
@@ -307,6 +332,7 @@ void backup(hostent *host, int port)
             printf("\nAccount deleted\n");
             string username = msg_string.substr(2, msg_string.length() - 3);
             printf("username: %s\n", username.c_str());
+            insertIntoLog(commit_log, "D|" + username);
             account_set.erase(username);
             continue;
         }
@@ -362,12 +388,11 @@ void backup(hostent *host, int port)
         printf("message: %s\n", message.c_str());
         printf("message length: %lu\n", strlen(message.c_str()));
 
-        // store these pieces into the pending_log map through an internal update
-        // pending_log[recipient] = pending_log[recipient] + "From " + sender + ": " + message + "\n";
-        // pending_log[sender] = pending_log[sender] + "To " + recipient + ": " + message + "\n";
+        // update internal chat history with the new message
         pair<string, string> p1 = make_pair(sender, message);
-
         chat_history[recipient].push_back(p1);
+
+        insertIntoLog(commit_log, "M|" + sender + "|" + recipient + "|" + message);
 
         // send acknowledgement to primary server
         // sendAck(primarySd, selfId, bytesWritten);
@@ -460,11 +485,8 @@ int main(int argc, char *argv[])
         exit(0);
     }
 
-    // recover state from log file if state is currently empty
-    if (account_set.empty())
-    {
-        recoverState();
-    }
+    // recover state from log file
+    recoverState();
 
     // listen for up to 10 requests at a time
     listen(serverSd, 12);
@@ -545,7 +567,8 @@ int main(int argc, char *argv[])
                     strcpy(msg, force_logout_msg);
                     send(existing_login_sd, (char *)&msg, sizeof(msg), 0);
                 }
-
+                
+                string existing_user = "1";
                 // if new account is being created, add commit to log
                 if (account_set.find(new_client_username) == account_set.end())
                 {
@@ -553,17 +576,18 @@ int main(int argc, char *argv[])
                     insertIntoLog(commit_log, "C|" + new_client_username);
                     writeCommitLogToFile(selfId);
                     account_set.insert(new_client_username);
+                    existing_user = "0";
                 }
                 active_users[new_client_username] = new_socket;
 
                 // send information about this new account creation to the backup servers
                 if (backup_servers[1])
                 {
-                    sendAccountCreation(new_client_username, backup_servers[1]);
+                    sendAccountCreation(new_client_username, backup_servers[1], existing_user);
                 }
                 if (backup_servers[2])
                 {
-                    sendAccountCreation(new_client_username, backup_servers[2]);
+                    sendAccountCreation(new_client_username, backup_servers[2], existing_user);
                 }
 
                 // display chat history for this user, if it exists

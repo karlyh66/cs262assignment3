@@ -71,9 +71,9 @@ string sendBackupMessage(
     return message;
 }
 
-string sendAccountCreation(string username, int backupfd) {
+string sendAccountCreation(string username, int backupfd, string existing_account) {
     printf("Letting backup server know that an account has been made \n");
-    string message = "0 " + username + "\n";  // 0 = account created
+    string message = existing_account + " " + username + "\n";  // 0 = account created, 1 = account already exists
     int bytesWritten = send(backupfd, message.c_str(), strlen(message.c_str()), 0);
     return message;
 }
