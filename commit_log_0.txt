@@ -5,3 +5,4 @@
 5:C|jim
 6:M|jim|moe|hey moe
 7:C|obama
+8:M|adam|obama|mr president, how are we doing today

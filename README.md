@@ -59,10 +59,14 @@ After each action (and at the beginning of a session), the server will prompt yo
 - There is no need to connect all the backup servers to the primary server before any clients go on--this is because the server socket can detect whether an incoming connection is from a client, or from a backup server.
 
 ## Persistence
-- Whenever anything happens, the primary server communicates with backup servers so that they are up-to-date. This includes:
-    - When any client sends a message to another, the primary server tells backup servers, which keep track of the messages. In case the primary server goes down, any backup servers are able to provide chat logs to the user.
-    - When a new client connects to the primary server (PS), the PS lets backup servers know to add the account to their set of accounts.
-    - When a client deletes their account, the PS lets backup servers know to delete the account from their set of accounts.
+The following design decision was assuming that the servers could access the same. This may not be the case
+- The primary server keeps a log of all write operations and their metadata: create/delete/send message
+    * This log is maintained in state, and written to a persistent text file.
+- In addition, whenever any write operation occurs, the primary server communicates with backup servers so that all the states are consistent. This includes:
+    * When any client sends a message to another, the primary server tells backup servers, which keep track of the messages. In case the primary server goes down, any backup servers are able to provide chat logs to the user.
+    * When a new client connects to the primary server (PS), the PS lets backup servers know to add the account to their set of accounts.
+    * When a client deletes their account, the PS lets backup servers know to delete the account from their set of accounts.
+- When any replica becomes PS, the restoreState() function updates the state according to the persistent log file.
 
 ## Other engineering decisions
 We used the select() Linux call to manage multiple client socket descriptors, so that multiple clients can connect to the server and talk to one another at the same time. select() is effective because it allows multiple processes to run concurrently (accessing shared memory) without the need for a new thread per client. Since select() operates on a fixed-size fd_set client_fds (a set of file descriptors), we limited the number of clients connecting at the same time to 10 to account for this. (If we wanted to, we could have increased this number to, say, 100+. The implementation does not change.)
